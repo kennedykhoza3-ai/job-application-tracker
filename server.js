@@ -23,10 +23,25 @@ const allowedStatuses = [
 
 if (!SESSION_SECRET) {
   console.error(
-    "SESSION_SECRET is missing. Please check your .env file."
+    "SESSION_SECRET is missing. Please check your environment variables."
   );
 
   process.exit(1);
+}
+
+
+/* =========================
+   PRODUCTION PROXY
+========================= */
+
+if (
+  process.env.NODE_ENV ===
+  "production"
+) {
+  app.set(
+    "trust proxy",
+    1
+  );
 }
 
 
@@ -64,6 +79,7 @@ app.use(
 
     cookie: {
       httpOnly: true,
+
       sameSite: "lax",
 
       secure:
@@ -1222,8 +1238,7 @@ app.listen(
   function () {
 
     console.log(
-      `Server running at http://localhost:${PORT}`
+      `Server running on port ${PORT}`
     );
-
   }
 );
