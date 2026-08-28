@@ -1,0 +1,27 @@
+{
+  "name": "job-application-tracker",
+  "version": "1.0.0",
+  "description": "A full-stack job application tracker built with Node.js, Express and SQLite.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "job-tracker",
+    "nodejs",
+    "express",
+    "sqlite"
+  ],
+  "author": "Kennedy Khoza",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "sqlite3": "^6.0.1"
+  }
+}

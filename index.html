@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Job Application Tracker</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- =========================
+         AUTH SECTION
+    ========================== -->
+
+    <div id="authSection">
+
+      <div class="auth-header">
+        <h1>Job Application Tracker</h1>
+
+        <p>
+          Track applications, interviews,
+          offers, and outcomes in one place.
+        </p>
+      </div>
+
+
+      <div class="auth-container">
+
+        <!-- REGISTER -->
+
+        <div class="auth-box">
+
+          <h2>Create Account</h2>
+
+          <form id="registerForm">
+
+            <input
+              id="registerName"
+              type="text"
+              placeholder="Full name"
+              required
+            >
+
+            <input
+              id="registerEmail"
+              type="email"
+              placeholder="Email address"
+              required
+            >
+
+            <input
+              id="registerPassword"
+              type="password"
+              placeholder="Password - minimum 8 characters"
+              minlength="8"
+              required
+            >
+
+            <button type="submit">
+              Register
+            </button>
+
+          </form>
+
+        </div>
+
+
+        <!-- LOGIN -->
+
+        <div class="auth-box">
+
+          <h2>Login</h2>
+
+          <form id="loginForm">
+
+            <input
+              id="loginEmail"
+              type="email"
+              placeholder="Email address"
+              required
+            >
+
+            <input
+              id="loginPassword"
+              type="password"
+              placeholder="Password"
+              required
+            >
+
+            <button type="submit">
+              Login
+            </button>
+
+          </form>
+
+        </div>
+
+      </div>
+
+
+      <p
+        id="authMessage"
+        class="message"
+      ></p>
+
+    </div>
+
+
+    <!-- =========================
+         MAIN APPLICATION
+    ========================== -->
+
+    <div
+      id="appSection"
+      class="hidden"
+    >
+
+      <!-- =========================
+           HEADER
+      ========================== -->
+
+      <div class="top-bar">
+
+        <div class="header-content">
+
+          <p class="dashboard-label">
+            Dashboard
+          </p>
+
+          <h1>
+            Job Application Tracker
+          </h1>
+
+          <p id="welcomeMessage"></p>
+
+        </div>
+
+
+        <button
+          id="logoutButton"
+          class="logout-btn"
+        >
+          Logout
+        </button>
+
+      </div>
+
+
+      <!-- =========================
+           DASHBOARD SUMMARY
+      ========================== -->
+
+      <div class="dashboard">
+
+        <div class="stat-card">
+
+          <p class="stat-label">
+            Total Applications
+          </p>
+
+          <p
+            id="totalCount"
+            class="stat-number"
+          >
+            0
+          </p>
+
+          <p class="stat-description">
+            Jobs being tracked
+          </p>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <p class="stat-label">
+            Interviews
+          </p>
+
+          <p
+            id="interviewCount"
+            class="stat-number"
+          >
+            0
+          </p>
+
+          <p class="stat-description">
+            Interview opportunities
+          </p>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <p class="stat-label">
+            Offers
+          </p>
+
+          <p
+            id="offerCount"
+            class="stat-number"
+          >
+            0
+          </p>
+
+          <p class="stat-description">
+            Successful applications
+          </p>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <p class="stat-label">
+            Rejected
+          </p>
+
+          <p
+            id="rejectedCount"
+            class="stat-number"
+          >
+            0
+          </p>
+
+          <p class="stat-description">
+            Closed opportunities
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <!-- =========================
+           APPLICATION FORM SECTION
+      ========================== -->
+
+      <section class="section-card">
+
+        <div class="section-heading">
+
+          <div>
+
+            <p class="section-label">
+              New Application
+            </p>
+
+            <h2>
+              Add Job Application
+            </h2>
+
+          </div>
+
+          <p class="section-help">
+            Add the job details below.
+          </p>
+
+        </div>
+
+
+        <form id="applicationForm">
+
+          <input
+            type="text"
+            id="company"
+            placeholder="Company name"
+            required
+          >
+
+          <input
+            type="text"
+            id="position"
+            placeholder="Position applied for"
+            required
+          >
+
+          <input
+            type="date"
+            id="dateApplied"
+            required
+          >
+
+          <select
+            id="status"
+            required
+          >
+
+            <option value="">
+              Select status
+            </option>
+
+            <option value="Applied">
+              Applied
+            </option>
+
+            <option value="Interview">
+              Interview
+            </option>
+
+            <option value="Offer">
+              Offer
+            </option>
+
+            <option value="Rejected">
+              Rejected
+            </option>
+
+          </select>
+
+          <button
+            id="submitButton"
+            type="submit"
+          >
+            Add Application
+          </button>
+
+        </form>
+
+      </section>
+
+
+      <!-- =========================
+           APPLICATION LIST SECTION
+      ========================== -->
+
+      <section class="section-card">
+
+        <div class="section-heading">
+
+          <div>
+
+            <p class="section-label">
+              Applications
+            </p>
+
+            <h2>
+              My Applications
+            </h2>
+
+          </div>
+
+          <p class="section-help">
+            Search or filter your saved applications.
+          </p>
+
+        </div>
+
+
+        <!-- SEARCH / FILTER -->
+
+        <div class="toolbar">
+
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search company or position..."
+          >
+
+          <select id="filterStatus">
+
+            <option value="All">
+              All statuses
+            </option>
+
+            <option value="Applied">
+              Applied
+            </option>
+
+            <option value="Interview">
+              Interview
+            </option>
+
+            <option value="Offer">
+              Offer
+            </option>
+
+            <option value="Rejected">
+              Rejected
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div id="applicationList"></div>
+
+      </section>
+
+    </div>
+
+  </div>
+
+
+  <script src="app.js"></script>
+
+</body>
+
+</html>
