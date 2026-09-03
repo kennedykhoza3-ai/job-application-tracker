@@ -396,7 +396,9 @@ function resetDashboard() {
 function getStatusClass(status) {
   return (
     "status-" +
-    status.toLowerCase()
+    String(status)
+      .toLowerCase()
+      .replaceAll(" ", "-")
   );
 }
 
@@ -410,10 +412,36 @@ function formatDate(dateValue) {
     return "";
   }
 
+  const dateString =
+    String(dateValue)
+      .split("T")[0];
+
+  const parts =
+    dateString.split("-");
+
+  if (parts.length !== 3) {
+    return dateString;
+  }
+
+  const year =
+    Number(parts[0]);
+
+  const month =
+    Number(parts[1]) - 1;
+
+  const day =
+    Number(parts[2]);
+
   const date =
     new Date(
-      `${dateValue}T00:00:00`
+      year,
+      month,
+      day
     );
+
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
 
   return date.toLocaleDateString(
     undefined,
@@ -445,14 +473,23 @@ function displayApplications() {
     applications.filter(
       function (app) {
 
-        const matchesSearch =
-          app.company
-            .toLowerCase()
-            .includes(searchText) ||
+        const company =
+          String(
+            app.company || ""
+          ).toLowerCase();
 
-          app.position
-            .toLowerCase()
-            .includes(searchText);
+        const position =
+          String(
+            app.position || ""
+          ).toLowerCase();
+
+        const matchesSearch =
+          company.includes(
+            searchText
+          ) ||
+          position.includes(
+            searchText
+          );
 
         const matchesStatus =
           selectedStatus === "All" ||
@@ -702,7 +739,7 @@ function editApplication(id) {
   const application =
     applications.find(
       function (app) {
-        return app.id === id;
+        return Number(app.id) === id;
       }
     );
 
@@ -713,22 +750,26 @@ function editApplication(id) {
   document.getElementById(
     "company"
   ).value =
-    application.company;
+    application.company || "";
 
   document.getElementById(
     "position"
   ).value =
-    application.position;
+    application.position || "";
 
   document.getElementById(
     "dateApplied"
   ).value =
-    application.dateApplied;
+    application.dateApplied
+      ? String(
+          application.dateApplied
+        ).split("T")[0]
+      : "";
 
   document.getElementById(
     "status"
   ).value =
-    application.status;
+    application.status || "";
 
   editingId = id;
 
@@ -803,7 +844,9 @@ async function deleteApplication(id) {
 ========================= */
 
 function escapeHtml(value) {
-  return String(value)
+  return String(
+    value ?? ""
+  )
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
