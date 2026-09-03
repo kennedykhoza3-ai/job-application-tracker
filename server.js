@@ -1,9 +1,9 @@
 require("dotenv").config();
 
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcrypt");
 const session = require("express-session");
+const { Pool } = require("pg");
 const path = require("path");
 
 const app = express();
@@ -14,6 +14,9 @@ const PORT =
 const SESSION_SECRET =
   process.env.SESSION_SECRET;
 
+const DATABASE_URL =
+  process.env.DATABASE_URL;
+
 const allowedStatuses = [
   "Applied",
   "Interview",
@@ -21,9 +24,22 @@ const allowedStatuses = [
   "Rejected"
 ];
 
+
+/* =========================
+   REQUIRED ENVIRONMENT
+========================= */
+
 if (!SESSION_SECRET) {
   console.error(
-    "SESSION_SECRET is missing. Please check your environment variables."
+    "SESSION_SECRET is missing."
+  );
+
+  process.exit(1);
+}
+
+if (!DATABASE_URL) {
+  console.error(
+    "DATABASE_URL is missing."
   );
 
   process.exit(1);
@@ -106,146 +122,121 @@ app.use(
 
 
 /* =========================
-   DATABASE
+   POSTGRESQL DATABASE
 ========================= */
 
-const db =
-  new sqlite3.Database(
-    "./applications.db",
-    function (error) {
+const pool =
+  new Pool({
+    connectionString:
+      DATABASE_URL,
 
-      if (error) {
-        console.error(
-          "Database connection error:",
-          error.message
-        );
+    ssl:
+      process.env.NODE_ENV ===
+      "production"
+        ? {
+            rejectUnauthorized:
+              false
+          }
+        : false
+  });
 
-        return;
-      }
 
-      console.log(
-        "Connected to SQLite database."
-      );
-    }
-  );
+pool.on(
+  "error",
+  function (error) {
+
+    console.error(
+      "Unexpected PostgreSQL error:",
+      error
+    );
+
+  }
+);
 
 
 /* =========================
    DATABASE SETUP
 ========================= */
 
-function initializeDatabase() {
+async function initializeDatabase() {
 
-  db.serialize(function () {
+  try {
 
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
 
-        name TEXT NOT NULL,
+        name VARCHAR(150)
+        NOT NULL,
 
-        email TEXT NOT NULL UNIQUE,
+        email VARCHAR(255)
+        NOT NULL
+        UNIQUE,
 
-        password_hash TEXT NOT NULL,
+        password_hash TEXT
+        NOT NULL,
 
-        created_at DATETIME
+        created_at TIMESTAMP
         DEFAULT CURRENT_TIMESTAMP
 
       )
     `);
 
 
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS applications (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
 
-        company TEXT NOT NULL,
+        company VARCHAR(255)
+        NOT NULL,
 
-        position TEXT NOT NULL,
+        position VARCHAR(255)
+        NOT NULL,
 
-        dateApplied TEXT NOT NULL,
+        date_applied DATE
+        NOT NULL,
 
-        status TEXT NOT NULL,
+        status VARCHAR(50)
+        NOT NULL,
 
-        user_id INTEGER,
+        user_id INTEGER
+        NOT NULL,
 
-        created_at DATETIME
-        DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP
+        DEFAULT CURRENT_TIMESTAMP,
+
+        CONSTRAINT
+        fk_application_user
+
+        FOREIGN KEY
+        (user_id)
+
+        REFERENCES users(id)
+
+        ON DELETE CASCADE
 
       )
     `);
 
 
-    db.all(
-      "PRAGMA table_info(applications)",
-
-      [],
-
-      function (error, columns) {
-
-        if (error) {
-
-          console.error(
-            "Could not inspect database:",
-            error.message
-          );
-
-          return;
-        }
-
-
-        const hasUserId =
-          columns.some(
-            function (column) {
-
-              return (
-                column.name ===
-                "user_id"
-              );
-
-            }
-          );
-
-
-        if (!hasUserId) {
-
-          db.run(
-            `
-              ALTER TABLE applications
-              ADD COLUMN user_id INTEGER
-            `,
-
-            function (error) {
-
-              if (error) {
-
-                console.error(
-                  "Database upgrade error:",
-                  error.message
-                );
-
-                return;
-              }
-
-              console.log(
-                "Applications table upgraded."
-              );
-
-            }
-          );
-
-        }
-
-      }
+    console.log(
+      "PostgreSQL database ready."
     );
 
-  });
+  } catch (error) {
+
+    console.error(
+      "Database initialization error:",
+      error
+    );
+
+    process.exit(1);
+
+  }
 
 }
-
-initializeDatabase();
 
 
 /* =========================
@@ -260,14 +251,19 @@ function requireLogin(
 
   if (!req.session.userId) {
 
-    return res.status(401).json({
-      error:
-        "You must be logged in."
-    });
+    return res
+      .status(401)
+      .json({
+
+        error:
+          "You must be logged in."
+
+      });
 
   }
 
   next();
+
 }
 
 
@@ -316,40 +312,56 @@ app.post(
       !password
     ) {
 
-      return res.status(400).json({
-        error:
-          "Name, email and password are required."
-      });
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Name, email and password are required."
+
+        });
 
     }
 
 
     if (name.length < 2) {
 
-      return res.status(400).json({
-        error:
-          "Please enter your full name."
-      });
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Please enter your full name."
+
+        });
 
     }
 
 
     if (!validEmail(email)) {
 
-      return res.status(400).json({
-        error:
-          "Please enter a valid email address."
-      });
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Please enter a valid email address."
+
+        });
 
     }
 
 
     if (password.length < 8) {
 
-      return res.status(400).json({
-        error:
-          "Password must contain at least 8 characters."
-      });
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Password must contain at least 8 characters."
+
+        });
 
     }
 
@@ -363,134 +375,79 @@ app.post(
         );
 
 
-      db.run(
-        `
-          INSERT INTO users
-          (
+      const result =
+        await pool.query(
+          `
+            INSERT INTO users
+            (
+              name,
+              email,
+              password_hash
+            )
+
+            VALUES
+            ($1, $2, $3)
+
+            RETURNING
+              id,
+              name,
+              email
+          `,
+
+          [
             name,
             email,
-            password_hash
-          )
-
-          VALUES (?, ?, ?)
-        `,
-
-        [
-          name,
-          email,
-          passwordHash
-        ],
-
-        function (error) {
-
-          if (error) {
-
-            if (
-              error.message.includes(
-                "UNIQUE"
-              )
-            ) {
-
-              return res
-                .status(409)
-                .json({
-
-                  error:
-                    "An account with this email already exists."
-
-                });
-
-            }
+            passwordHash
+          ]
+        );
 
 
-            console.error(
-              error.message
-            );
+      const user =
+        result.rows[0];
 
 
-            return res
-              .status(500)
-              .json({
-
-                error:
-                  "Could not create account."
-
-              });
-
-          }
+      req.session.userId =
+        user.id;
 
 
-          const userId =
-            this.lastID;
+      req.session.userName =
+        user.name;
 
 
-          req.session.userId =
-            userId;
+      return res
+        .status(201)
+        .json({
 
+          message:
+            "Account created successfully.",
 
-          req.session.userName =
-            name;
+          user
 
-
-          db.get(
-            `
-              SELECT COUNT(*)
-              AS total
-              FROM users
-            `,
-
-            [],
-
-            function (
-              countError,
-              result
-            ) {
-
-              if (
-                !countError &&
-                result.total === 1
-              ) {
-
-                db.run(
-                  `
-                    UPDATE applications
-
-                    SET user_id = ?
-
-                    WHERE user_id
-                    IS NULL
-                  `,
-
-                  [userId]
-                );
-
-              }
-
-            }
-          );
-
-
-          return res
-            .status(201)
-            .json({
-
-              message:
-                "Account created successfully.",
-
-              user: {
-                id: userId,
-                name,
-                email
-              }
-
-            });
-
-        }
-      );
+        });
 
     } catch (error) {
 
-      console.error(error);
+      if (
+        error.code ===
+        "23505"
+      ) {
+
+        return res
+          .status(409)
+          .json({
+
+            error:
+              "An account with this email already exists."
+
+          });
+
+      }
+
+
+      console.error(
+        "Registration error:",
+        error
+      );
 
 
       return res
@@ -498,7 +455,7 @@ app.post(
         .json({
 
           error:
-            "Registration failed."
+            "Could not create account."
 
         });
 
@@ -515,7 +472,7 @@ app.post(
 app.post(
   "/api/login",
 
-  function (req, res) {
+  async function (req, res) {
 
     const email =
       req.body.email
@@ -543,115 +500,111 @@ app.post(
     }
 
 
-    db.get(
-      `
-        SELECT *
-        FROM users
-        WHERE email = ?
-      `,
+    try {
 
-      [email],
+      const result =
+        await pool.query(
+          `
+            SELECT
+              id,
+              name,
+              email,
+              password_hash
 
-      async function (
-        error,
-        user
+            FROM users
+
+            WHERE email = $1
+          `,
+
+          [email]
+        );
+
+
+      if (
+        result.rows.length === 0
       ) {
 
-        if (error) {
+        return res
+          .status(401)
+          .json({
 
-          console.error(
-            error.message
-          );
-
-
-          return res
-            .status(500)
-            .json({
-
-              error:
-                "Database error."
-
-            });
-
-        }
-
-
-        if (!user) {
-
-          return res
-            .status(401)
-            .json({
-
-              error:
-                "Incorrect email or password."
-
-            });
-
-        }
-
-
-        try {
-
-          const passwordMatches =
-            await bcrypt.compare(
-              password,
-              user.password_hash
-            );
-
-
-          if (!passwordMatches) {
-
-            return res
-              .status(401)
-              .json({
-
-                error:
-                  "Incorrect email or password."
-
-              });
-
-          }
-
-
-          req.session.userId =
-            user.id;
-
-
-          req.session.userName =
-            user.name;
-
-
-          return res.json({
-
-            message:
-              "Login successful.",
-
-            user: {
-              id: user.id,
-              name: user.name,
-              email: user.email
-            }
+            error:
+              "Incorrect email or password."
 
           });
 
-        } catch (error) {
-
-          console.error(error);
+      }
 
 
-          return res
-            .status(500)
-            .json({
+      const user =
+        result.rows[0];
 
-              error:
-                "Login failed."
 
-            });
+      const passwordMatches =
+        await bcrypt.compare(
+          password,
+          user.password_hash
+        );
 
-        }
+
+      if (!passwordMatches) {
+
+        return res
+          .status(401)
+          .json({
+
+            error:
+              "Incorrect email or password."
+
+          });
 
       }
-    );
+
+
+      req.session.userId =
+        user.id;
+
+
+      req.session.userName =
+        user.name;
+
+
+      return res.json({
+
+        message:
+          "Login successful.",
+
+        user: {
+          id:
+            user.id,
+
+          name:
+            user.name,
+
+          email:
+            user.email
+        }
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Login error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Login failed."
+
+        });
+
+    }
 
   }
 );
@@ -709,7 +662,7 @@ app.post(
 app.get(
   "/api/me",
 
-  function (req, res) {
+  async function (req, res) {
 
     if (!req.session.userId) {
 
@@ -724,53 +677,69 @@ app.get(
     }
 
 
-    db.get(
-      `
-        SELECT
-          id,
-          name,
-          email
+    try {
 
-        FROM users
+      const result =
+        await pool.query(
+          `
+            SELECT
+              id,
+              name,
+              email
 
-        WHERE id = ?
-      `,
+            FROM users
 
-      [
-        req.session.userId
-      ],
+            WHERE id = $1
+          `,
 
-      function (
-        error,
-        user
+          [
+            req.session.userId
+          ]
+        );
+
+
+      if (
+        result.rows.length === 0
       ) {
 
-        if (
-          error ||
-          !user
-        ) {
+        return res
+          .status(401)
+          .json({
 
-          return res
-            .status(401)
-            .json({
+            loggedIn: false
 
-              loggedIn: false
+          });
 
-            });
-
-        }
+      }
 
 
-        return res.json({
+      return res.json({
 
-          loggedIn: true,
+        loggedIn: true,
 
-          user
+        user:
+          result.rows[0]
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Current user error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Could not load user."
 
         });
 
-      }
-    );
+    }
 
   }
 );
@@ -785,53 +754,64 @@ app.get(
 
   requireLogin,
 
-  function (req, res) {
+  async function (req, res) {
 
-    db.all(
-      `
-        SELECT *
+    try {
 
-        FROM applications
+      const result =
+        await pool.query(
+          `
+            SELECT
 
-        WHERE user_id = ?
+              id,
 
-        ORDER BY id DESC
-      `,
+              company,
 
-      [
-        req.session.userId
-      ],
+              position,
 
-      function (
-        error,
-        rows
-      ) {
+              date_applied
+              AS "dateApplied",
 
-        if (error) {
+              status,
 
-          console.error(
-            error.message
-          );
+              created_at
+              AS "createdAt"
 
+            FROM applications
 
-          return res
-            .status(500)
-            .json({
+            WHERE user_id = $1
 
-              error:
-                "Could not load applications."
+            ORDER BY id DESC
+          `,
 
-            });
-
-        }
-
-
-        return res.json(
-          rows
+          [
+            req.session.userId
+          ]
         );
 
-      }
-    );
+
+      return res.json(
+        result.rows
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Load applications error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Could not load applications."
+
+        });
+
+    }
 
   }
 );
@@ -846,7 +826,7 @@ app.post(
 
   requireLogin,
 
-  function (req, res) {
+  async function (req, res) {
 
     const company =
       req.body.company
@@ -896,68 +876,71 @@ app.post(
     }
 
 
-    db.run(
-      `
-        INSERT INTO applications
-        (
-          company,
-          position,
-          dateApplied,
-          status,
-          user_id
-        )
+    try {
 
-        VALUES (?, ?, ?, ?, ?)
-      `,
+      const result =
+        await pool.query(
+          `
+            INSERT INTO applications
+            (
+              company,
+              position,
+              date_applied,
+              status,
+              user_id
+            )
 
-      [
-        company,
-        position,
-        dateApplied,
-        status,
-        req.session.userId
-      ],
+            VALUES
+            ($1, $2, $3, $4, $5)
 
-      function (error) {
+            RETURNING
 
-        if (error) {
+              id,
 
-          console.error(
-            error.message
-          );
+              company,
 
+              position,
 
-          return res
-            .status(500)
-            .json({
+              date_applied
+              AS "dateApplied",
 
-              error:
-                "Could not save application."
+              status
+          `,
 
-            });
-
-        }
-
-
-        return res
-          .status(201)
-          .json({
-
-            id:
-              this.lastID,
-
+          [
             company,
-
             position,
-
             dateApplied,
+            status,
+            req.session.userId
+          ]
+        );
 
-            status
 
-          });
+      return res
+        .status(201)
+        .json(
+          result.rows[0]
+        );
 
-      }
-    );
+    } catch (error) {
+
+      console.error(
+        "Create application error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Could not save application."
+
+        });
+
+    }
 
   }
 );
@@ -972,7 +955,7 @@ app.put(
 
   requireLogin,
 
-  function (req, res) {
+  async function (req, res) {
 
     const id =
       Number(req.params.id);
@@ -1039,76 +1022,81 @@ app.put(
     }
 
 
-    db.run(
-      `
-        UPDATE applications
+    try {
 
-        SET
-          company = ?,
-          position = ?,
-          dateApplied = ?,
-          status = ?
+      const result =
+        await pool.query(
+          `
+            UPDATE applications
 
-        WHERE id = ?
+            SET
+              company = $1,
 
-        AND user_id = ?
-      `,
+              position = $2,
 
-      [
-        company,
-        position,
-        dateApplied,
-        status,
-        id,
-        req.session.userId
-      ],
+              date_applied = $3,
 
-      function (error) {
+              status = $4
 
-        if (error) {
+            WHERE id = $5
 
-          console.error(
-            error.message
-          );
+            AND user_id = $6
 
+            RETURNING id
+          `,
 
-          return res
-            .status(500)
-            .json({
-
-              error:
-                "Could not update application."
-
-            });
-
-        }
+          [
+            company,
+            position,
+            dateApplied,
+            status,
+            id,
+            req.session.userId
+          ]
+        );
 
 
-        if (
-          this.changes === 0
-        ) {
+      if (
+        result.rows.length === 0
+      ) {
 
-          return res
-            .status(404)
-            .json({
+        return res
+          .status(404)
+          .json({
 
-              error:
-                "Application not found."
+            error:
+              "Application not found."
 
-            });
+          });
 
-        }
+      }
 
 
-        return res.json({
+      return res.json({
 
-          message:
-            "Application updated successfully."
+        message:
+          "Application updated successfully."
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Update application error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Could not update application."
 
         });
 
-      }
-    );
+    }
 
   }
 );
@@ -1123,7 +1111,7 @@ app.delete(
 
   requireLogin,
 
-  function (req, res) {
+  async function (req, res) {
 
     const id =
       Number(req.params.id);
@@ -1143,66 +1131,68 @@ app.delete(
     }
 
 
-    db.run(
-      `
-        DELETE FROM applications
+    try {
 
-        WHERE id = ?
+      const result =
+        await pool.query(
+          `
+            DELETE FROM applications
 
-        AND user_id = ?
-      `,
+            WHERE id = $1
 
-      [
-        id,
-        req.session.userId
-      ],
+            AND user_id = $2
 
-      function (error) {
+            RETURNING id
+          `,
 
-        if (error) {
-
-          console.error(
-            error.message
-          );
+          [
+            id,
+            req.session.userId
+          ]
+        );
 
 
-          return res
-            .status(500)
-            .json({
+      if (
+        result.rows.length === 0
+      ) {
 
-              error:
-                "Could not delete application."
+        return res
+          .status(404)
+          .json({
 
-            });
+            error:
+              "Application not found."
 
-        }
+          });
 
-
-        if (
-          this.changes === 0
-        ) {
-
-          return res
-            .status(404)
-            .json({
-
-              error:
-                "Application not found."
-
-            });
-
-        }
+      }
 
 
-        return res.json({
+      return res.json({
 
-          message:
-            "Application deleted successfully."
+        message:
+          "Application deleted successfully."
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Delete application error:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          error:
+            "Could not delete application."
 
         });
 
-      }
-    );
+    }
 
   }
 );
@@ -1232,13 +1222,24 @@ app.get(
    START SERVER
 ========================= */
 
-app.listen(
-  PORT,
+async function startServer() {
 
-  function () {
+  await initializeDatabase();
 
-    console.log(
-      `Server running on port ${PORT}`
-    );
-  }
-);
+
+  app.listen(
+    PORT,
+
+    function () {
+
+      console.log(
+        `Server running on port ${PORT}`
+      );
+
+    }
+  );
+
+}
+
+
+startServer();
