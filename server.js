@@ -201,6 +201,8 @@ async function initializeDatabase() {
         status VARCHAR(50)
         NOT NULL,
 
+        job_link TEXT,
+
         user_id INTEGER
         NOT NULL,
 
@@ -218,6 +220,20 @@ async function initializeDatabase() {
         ON DELETE CASCADE
 
       )
+    `);
+
+
+    /*
+      Add job_link to databases
+      that already have the
+      applications table.
+    */
+
+    await pool.query(`
+      ALTER TABLE applications
+
+      ADD COLUMN IF NOT EXISTS
+      job_link TEXT
     `);
 
 
@@ -280,6 +296,31 @@ function validStatus(status) {
   return allowedStatuses.includes(
     status
   );
+
+}
+
+
+function validJobLink(jobLink) {
+
+  if (!jobLink) {
+    return true;
+  }
+
+  try {
+
+    const url =
+      new URL(jobLink);
+
+    return (
+      url.protocol === "http:" ||
+      url.protocol === "https:"
+    );
+
+  } catch (error) {
+
+    return false;
+
+  }
 
 }
 
@@ -774,6 +815,9 @@ app.get(
 
               status,
 
+              job_link
+              AS "jobLink",
+
               created_at
               AS "createdAt"
 
@@ -842,6 +886,10 @@ app.post(
     const status =
       req.body.status;
 
+    const jobLink =
+      req.body.jobLink
+        ?.trim() || null;
+
 
     if (
       !company ||
@@ -855,7 +903,7 @@ app.post(
         .json({
 
           error:
-            "All fields are required."
+            "Company, position, date and status are required."
 
         });
 
@@ -876,6 +924,20 @@ app.post(
     }
 
 
+    if (!validJobLink(jobLink)) {
+
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Please enter a valid job link beginning with http:// or https://."
+
+        });
+
+    }
+
+
     try {
 
       const result =
@@ -887,11 +949,19 @@ app.post(
               position,
               date_applied,
               status,
+              job_link,
               user_id
             )
 
             VALUES
-            ($1, $2, $3, $4, $5)
+            (
+              $1,
+              $2,
+              $3,
+              $4,
+              $5,
+              $6
+            )
 
             RETURNING
 
@@ -904,7 +974,10 @@ app.post(
               date_applied
               AS "dateApplied",
 
-              status
+              status,
+
+              job_link
+              AS "jobLink"
           `,
 
           [
@@ -912,6 +985,7 @@ app.post(
             position,
             dateApplied,
             status,
+            jobLink,
             req.session.userId
           ]
         );
@@ -974,6 +1048,10 @@ app.put(
     const status =
       req.body.status;
 
+    const jobLink =
+      req.body.jobLink
+        ?.trim() || null;
+
 
     if (!Number.isInteger(id)) {
 
@@ -1001,7 +1079,7 @@ app.put(
         .json({
 
           error:
-            "All fields are required."
+            "Company, position, date and status are required."
 
         });
 
@@ -1022,6 +1100,20 @@ app.put(
     }
 
 
+    if (!validJobLink(jobLink)) {
+
+      return res
+        .status(400)
+        .json({
+
+          error:
+            "Please enter a valid job link beginning with http:// or https://."
+
+        });
+
+    }
+
+
     try {
 
       const result =
@@ -1036,13 +1128,29 @@ app.put(
 
               date_applied = $3,
 
-              status = $4
+              status = $4,
 
-            WHERE id = $5
+              job_link = $5
 
-            AND user_id = $6
+            WHERE id = $6
 
-            RETURNING id
+            AND user_id = $7
+
+            RETURNING
+
+              id,
+
+              company,
+
+              position,
+
+              date_applied
+              AS "dateApplied",
+
+              status,
+
+              job_link
+              AS "jobLink"
           `,
 
           [
@@ -1050,6 +1158,7 @@ app.put(
             position,
             dateApplied,
             status,
+            jobLink,
             id,
             req.session.userId
           ]
@@ -1075,7 +1184,10 @@ app.put(
       return res.json({
 
         message:
-          "Application updated successfully."
+          "Application updated successfully.",
+
+        application:
+          result.rows[0]
 
       });
 

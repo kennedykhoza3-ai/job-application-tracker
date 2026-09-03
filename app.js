@@ -528,6 +528,26 @@ function displayApplications() {
       card.className =
         "application-card";
 
+
+      let jobLinkHtml = "";
+
+      if (app.jobLink) {
+        jobLinkHtml = `
+          <p>
+            <strong>Job link:</strong>
+
+            <a
+              href="${escapeHtml(app.jobLink)}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open Job
+            </a>
+          </p>
+        `;
+      }
+
+
       card.innerHTML = `
         <h3>
           ${escapeHtml(app.position)}
@@ -556,6 +576,8 @@ function displayApplications() {
             ${escapeHtml(app.status)}
           </span>
         </p>
+
+        ${jobLinkHtml}
 
         <div class="card-actions">
 
@@ -615,7 +637,13 @@ form.addEventListener(
       status:
         document
           .getElementById("status")
+          .value,
+
+      jobLink:
+        document
+          .getElementById("jobLink")
           .value
+          .trim()
     };
 
     let url =
@@ -770,6 +798,11 @@ function editApplication(id) {
     "status"
   ).value =
     application.status || "";
+
+  document.getElementById(
+    "jobLink"
+  ).value =
+    application.jobLink || "";
 
   editingId = id;
 
